@@ -1,9 +1,7 @@
 import numpy as np
 import cv2
-from scipy.misc import imresize
 from keras.models import load_model
 import matplotlib.pyplot as plt
-from perspective import *
 from line_property import *
 
 
@@ -56,19 +54,19 @@ class Lanes_Detection():
         left_line = []
         right_line = []
         for y in range(0,len(warped),1): # 80
-            minx = 160;
-            maxx = 0;
+            minx = 160
+            maxx = 0
             for x in range(0,len(warped[1]),1): # 160
                 if warped[y][x][1] >= 200:
                     if x < minx:
-                        minx = x;
+                        minx = x
                     if x > maxx:
                         maxx = x
             left_line.append([minx, y])
             right_line.append([maxx, y])
         left_line, self.radius_of_curvature = self.polynomial_fit(left_line)
         right_line, _ = self.polynomial_fit(right_line)
-        left_line.sort(axis=1)
+        # left_line.sort(axis=0)
         return warped, left_line, right_line
 
     def polynomial_fit(self, line):
@@ -79,13 +77,13 @@ class Lanes_Detection():
         y = polynomial(line[:, 0])
         radius_of_curvature = ((1 + (2 * coefficients[0] * 0 + coefficients[1]) ** 2) ** 1.5) \
                                 / np.absolute(2 * coefficients[0])
-        print("Curvature: ",self.radius_of_curvature)
+        #print("Curvature: ",self.radius_of_curvature)
         return np.array([x*1280/160, y*720/80],np.int), radius_of_curvature
 
     def draw_line(self, image, line):
         # Re-size to match the original image
         # self.offset = abs((left_line[0,0] + right_line[0,0])/2-640)
-        lane_image = imresize(image, (720, 1280, 3))
+        lane_image = cv2.resize(image, (1280,720),interpolation=cv2.INTER_AREA)
         line = line.transpose()
         line = line.reshape((-1, 1, 2))
         cv2.polylines(lane_image, [line], False,(0,255,0),thickness=3,lineType=8)
@@ -109,10 +107,9 @@ class Lanes_Detection():
         first_loop = True
 
         # Get image ready for feeding into model
-        small_img = imresize(image, (80, 160, 3))
+        small_img = cv2.resize(image, (160,80),interpolation = cv2.INTER_AREA)
         small_img = np.array(small_img)
         small_img = small_img[None,:,:,:]
-
         # Make prediction with neural network (un-normalize value by multiplying by 255)
         prediction = model.predict(small_img)[0] * 255
 
@@ -156,15 +153,14 @@ class Lanes_Detection():
         lane_image = self.draw_line(lane_image,right_line)
         lane_image = cv2.cvtColor(lane_image,cv2.COLOR_BGR2RGB)
 
-
         # Use Perspective Transformation to get curvature
         bird, left_line_bird, right_line_bird = self.perspective_transform(lane_drawn)
-        bird = imresize(bird, (720,1280,3))
-        lane_drawn = np.dstack((blanks, blanks, blanks))
-        bird_line = self.draw_line(bird, left_line_bird)
-        bird_line = self.draw_line(bird_line, right_line_bird)
+        bird = cv2.resize(bird, (1280,720),interpolation = cv2.INTER_AREA)
 
-        lane_image = np.hstack([lane_image,bird_line])
+        lane_drawn = np.dstack((blanks, blanks, blanks))
+        bird_line = self.draw_line(lane_image, left_line_bird)
+        bird_line = self.draw_line(bird_line, right_line_bird)
+        #lane_image = np.hstack([lane_image,bird_line])
         return lane_image
 
 
@@ -176,13 +172,13 @@ if __name__ == "__main__":
     cap = cv2.VideoCapture("project_video.mp4")
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
     while cap.isOpened():
-        ret,frame = cap.read()
-        frame = cv2.cvtColor(frame,cv2.COLOR_RGB2BGR)  # SCNN accepts BGR format
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # SCNN accepts BGR format
         frame_ml = lanes.road_lines(frame)
-        # if not ret:
-        #     frame_rgb = frame
-        #frame_rgb = np.concatenate((frame_rgb,birdeye_img),axis=1)
         cv2.imshow("Camera", frame_ml)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
