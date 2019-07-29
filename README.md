@@ -9,9 +9,7 @@ Develop an Spatial Convolutional Neural Network to detect lane
 1. Opencv-python
 2. Tensorflow-gpu
 3. Keras
-4. Scipy
-5. Numpy
-6. Matplotlib
+4. Numpy
 ```
 
 ## Running the tests
